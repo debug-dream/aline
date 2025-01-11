@@ -6,7 +6,11 @@
  *
  * Returns [matchIndexStart, matchIndexEnd] if found, or false if not found.
  */
-function lineTrimmedFallbackMatch(originalContent: string, searchContent: string, startIndex: number): [number, number] | false {
+function lineTrimmedFallbackMatch(
+	originalContent: string,
+	searchContent: string,
+	startIndex: number,
+): [number, number] | false {
 	// Split both contents into lines
 	const originalLines = originalContent.split("\n")
 	const searchLines = searchContent.split("\n")
@@ -87,7 +91,11 @@ function lineTrimmedFallbackMatch(originalContent: string, searchContent: string
  * @param startIndex - The character index in originalContent where to start searching
  * @returns A tuple of [startIndex, endIndex] if a match is found, false otherwise
  */
-function blockAnchorFallbackMatch(originalContent: string, searchContent: string, startIndex: number): [number, number] | false {
+function blockAnchorFallbackMatch(
+	originalContent: string,
+	searchContent: string,
+	startIndex: number,
+): [number, number] | false {
 	const originalLines = originalContent.split("\n")
 	const searchLines = searchContent.split("\n")
 
@@ -200,7 +208,11 @@ function blockAnchorFallbackMatch(originalContent: string, searchContent: string
  * - If the search block cannot be matched using any of the available matching strategies,
  *   an error is thrown.
  */
-export async function constructNewFileContent(diffContent: string, originalContent: string, isFinal: boolean): Promise<string> {
+export async function constructNewFileContent(
+	diffContent: string,
+	originalContent: string,
+	isFinal: boolean,
+): Promise<string> {
 	let result = ""
 	let lastProcessedIndex = 0
 
@@ -274,12 +286,20 @@ export async function constructNewFileContent(diffContent: string, originalConte
 					searchEndIndex = exactIndex + currentSearchContent.length
 				} else {
 					// Attempt fallback line-trimmed matching
-					const lineMatch = lineTrimmedFallbackMatch(originalContent, currentSearchContent, lastProcessedIndex)
+					const lineMatch = lineTrimmedFallbackMatch(
+						originalContent,
+						currentSearchContent,
+						lastProcessedIndex,
+					)
 					if (lineMatch) {
 						;[searchMatchIndex, searchEndIndex] = lineMatch
 					} else {
 						// Try block anchor fallback for larger blocks
-						const blockMatch = blockAnchorFallbackMatch(originalContent, currentSearchContent, lastProcessedIndex)
+						const blockMatch = blockAnchorFallbackMatch(
+							originalContent,
+							currentSearchContent,
+							lastProcessedIndex,
+						)
 						if (blockMatch) {
 							;[searchMatchIndex, searchEndIndex] = blockMatch
 						} else {
@@ -322,7 +342,6 @@ export async function constructNewFileContent(diffContent: string, originalConte
 		// Accumulate content for search or replace
 		// (currentReplaceContent is not being used for anything right now since we directly append to result.)
 		// (We artificially add a linebreak since we split on \n at the beginning. In order to not include a trailing linebreak in the final search/result blocks we need to remove it before using them. This allows for partial line matches to be correctly identified.)
-		// NOTE: search/replace blocks must be arranged in the order they appear in the file due to how we build the content using lastProcessedIndex. We also cannot strip the trailing newline since for non-partial lines it would remove the linebreak from the original content. (If we remove end linebreak from search, then we'd also have to remove it from replace but we can't know if it's a partial line or not since the model may be using the line break to indicate the end of the block rather than as part of the search content.) We require the model to output full lines in order for our fallbacks to work as well.
 		if (inSearch) {
 			currentSearchContent += line + "\n"
 		} else if (inReplace) {

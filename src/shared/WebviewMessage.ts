@@ -26,18 +26,16 @@ export interface WebviewMessage {
 		| "openMcpSettings"
 		| "restartMcpServer"
 		| "autoApprovalSettings"
-		| "checkpointDiff"
-		| "checkpointRestore"
-		| "taskCompletionViewChanges"
+		| "loadSystemPrompts"
+		| "updateSystemPrompt"
+		| "switchToProvider"
+		| "loadModelOptions"
 	text?: string
 	askResponse?: ClineAskResponse
 	apiConfiguration?: ApiConfiguration
 	images?: string[]
 	bool?: boolean
-	number?: number
 	autoApprovalSettings?: AutoApprovalSettings
 }
 
 export type ClineAskResponse = "yesButtonClicked" | "noButtonClicked" | "messageResponse"
-
-export type ClineCheckpointRestore = "task" | "workspace" | "taskAndWorkspace"

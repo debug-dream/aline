@@ -1,9 +1,12 @@
 // type that represents json data that is sent from extension to webview, called ExtensionMessage and has 'type' enum which can be 'plusButtonClicked' or 'settingsButtonClicked' or 'hello'
 
+import { ModelOption } from "./AlineConfig"
 import { ApiConfiguration, ModelInfo } from "./api"
 import { AutoApprovalSettings } from "./AutoApprovalSettings"
 import { HistoryItem } from "./HistoryItem"
 import { McpServer } from "./mcp"
+import { SystemPrompt } from "./SystemPrompt"
+import { ChatMessage } from '@sourcegraph/cody-shared/src/chat/transcript/messages'
 
 // webview will hold state
 export interface ExtensionMessage {
@@ -19,9 +22,14 @@ export interface ExtensionMessage {
 		| "partialMessage"
 		| "openRouterModels"
 		| "mcpServers"
-		| "relinquishControl"
+		| "transcript"
 	text?: string
-	action?: "chatButtonClicked" | "mcpButtonClicked" | "settingsButtonClicked" | "historyButtonClicked" | "didBecomeVisible"
+	action?:
+		| "chatButtonClicked"
+		| "mcpButtonClicked"
+		| "settingsButtonClicked"
+		| "historyButtonClicked"
+		| "didBecomeVisible"
 	invoke?: "sendMessage" | "primaryButtonClick" | "secondaryButtonClick"
 	state?: ExtensionState
 	images?: string[]
@@ -31,6 +39,7 @@ export interface ExtensionMessage {
 	partialMessage?: ClineMessage
 	openRouterModels?: Record<string, ModelInfo>
 	mcpServers?: McpServer[]
+	transcript?: ChatMessage[]
 }
 
 export interface ExtensionState {
@@ -38,12 +47,13 @@ export interface ExtensionState {
 	apiConfiguration?: ApiConfiguration
 	customInstructions?: string
 	uriScheme?: string
-	currentTaskItem?: HistoryItem
-	checkpointTrackerErrorMessage?: string
 	clineMessages: ClineMessage[]
 	taskHistory: HistoryItem[]
+	systemPrompts: SystemPrompt[]
+	systemPrompt: SystemPrompt
 	shouldShowAnnouncement: boolean
 	autoApprovalSettings: AutoApprovalSettings
+	modelOptions: ModelOption[]
 }
 
 export interface ClineMessage {
@@ -54,9 +64,6 @@ export interface ClineMessage {
 	text?: string
 	images?: string[]
 	partial?: boolean
-	lastCheckpointHash?: string
-	conversationHistoryIndex?: number
-	conversationHistoryDeletedRange?: [number, number] // for when conversation history is truncated for API requests
 }
 
 export type ClineAsk =
@@ -94,7 +101,6 @@ export type ClineSay =
 	| "mcp_server_response"
 	| "use_mcp_server"
 	| "diff_error"
-	| "deleted_api_reqs"
 
 export interface ClineSayTool {
 	tool:
@@ -150,4 +156,10 @@ export interface ClineApiReqInfo {
 
 export type ClineApiReqCancelReason = "streaming_failed" | "user_cancelled"
 
-export const COMPLETION_RESULT_CHANGES_FLAG = "HAS_CHANGES"
+export function toChatMessage(clineMessage: ClineMessage): ChatMessage {
+	const chatMessage: ChatMessage = {
+		speaker: clineMessage.type === "ask" ? "human" : "assistant",
+		displayText: clineMessage.text || ""
+	}
+	return chatMessage
+}

@@ -72,6 +72,7 @@ This approach allows us to leverage advanced features when available while ensur
 declare module "vscode" {
 	// https://github.com/microsoft/vscode/blob/f0417069c62e20f3667506f4b7e53ca0004b4e3e/src/vscode-dts/vscode.d.ts#L7442
 	interface Terminal {
+		// @ts-ignore Type compatibility issues with built-in VSCode types
 		shellIntegration?: {
 			cwd?: vscode.Uri
 			executeCommand?: (command: string) => {

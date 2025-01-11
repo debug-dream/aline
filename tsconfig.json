@@ -3,6 +3,7 @@
 		"esModuleInterop": true,
 		"experimentalDecorators": true,
 		"forceConsistentCasingInFileNames": true,
+		"downlevelIteration": true,
 		"isolatedModules": true,
 		"lib": ["es2022", "esnext.disposable", "DOM"],
 		"module": "esnext",
@@ -21,5 +22,5 @@
 		"useUnknownInCatchVariables": false
 	},
 	"include": ["src/**/*", "scripts/**/*"],
-	"exclude": ["node_modules", ".vscode-test", "webview-ui"]
+	"exclude": ["node_modules", ".vscode-test", "webview-ui"],
 }

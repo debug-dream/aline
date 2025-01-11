@@ -10,7 +10,8 @@ const WelcomeView = () => {
 
 	const [apiErrorMessage, setApiErrorMessage] = useState<string | undefined>(undefined)
 
-	const disableLetsGoButton = apiErrorMessage != null
+	// const disableLetsGoButton = apiErrorMessage != null
+	const disableLetsGoButton = false
 
 	const handleSubmit = () => {
 		vscode.postMessage({ type: "apiConfiguration", apiConfiguration })
@@ -21,16 +22,8 @@ const WelcomeView = () => {
 	}, [apiConfiguration])
 
 	return (
-		<div
-			style={{
-				position: "fixed",
-				top: 0,
-				left: 0,
-				right: 0,
-				bottom: 0,
-				padding: "0 20px",
-			}}>
-			<h2>Hi, I'm Cline</h2>
+		<div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, padding: "0 20px" }}>
+			<h2>Hi, I'm Aline</h2>
 			<p>
 				I can do all kinds of tasks thanks to the latest breakthroughs in{" "}
 				<VSCodeLink
@@ -38,9 +31,9 @@ const WelcomeView = () => {
 					style={{ display: "inline" }}>
 					Claude 3.5 Sonnet's agentic coding capabilities
 				</VSCodeLink>{" "}
-				and access to tools that let me create & edit files, explore complex projects, use the browser, and execute
-				terminal commands (with your permission, of course). I can even use MCP to create new tools and extend my own
-				capabilities.
+				and access to tools that let me create & edit files, explore complex projects, use the browser, and
+				execute terminal commands (with your permission, of course). I can even use MCP to create new tools and
+				extend my own capabilities.
 			</p>
 
 			<b>To get started, this extension needs an API provider for Claude 3.5 Sonnet.</b>

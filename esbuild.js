@@ -66,10 +66,9 @@ const extensionConfig = {
 	bundle: true,
 	minify: production,
 	sourcemap: !production,
-	logLevel: "silent",
+	logLevel: "info",
 	plugins: [
 		copyWasmFiles,
-		/* add to the end of plugins array */
 		esbuildProblemMatcherPlugin,
 	],
 	entryPoints: ["src/extension.ts"],
@@ -78,19 +77,25 @@ const extensionConfig = {
 	platform: "node",
 	outfile: "dist/extension.js",
 	external: ["vscode"],
+	metafile: true,
+	treeShaking: true,
 }
 
 async function main() {
-	const extensionCtx = await esbuild.context(extensionConfig)
-	if (watch) {
-		await extensionCtx.watch()
-	} else {
-		await extensionCtx.rebuild()
-		await extensionCtx.dispose()
+	try {
+		const ctx = await esbuild.context(extensionConfig)
+		
+		if (watch) {
+			await ctx.watch()
+			console.log('Watching...')
+		} else {
+			await ctx.rebuild()
+			await ctx.dispose()
+		}
+	} catch (e) {
+		console.error('Build failed:', e)
+		process.exit(1)
 	}
 }
 
-main().catch((e) => {
-	console.error(e)
-	process.exit(1)
-})
+main()

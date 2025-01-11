@@ -6,7 +6,7 @@ import { ClineProvider } from "./core/webview/ClineProvider"
 import { createClineAPI } from "./exports"
 import "./utils/path" // necessary to have access to String.prototype.toPosix
 import { DIFF_VIEW_URI_SCHEME } from "./integrations/editor/DiffViewProvider"
-
+import { alineActivate, alineDeactivate } from "./aline"
 /*
 Built using https://github.com/microsoft/vscode-webview-ui-toolkit
 
@@ -35,23 +35,21 @@ export function activate(context: vscode.ExtensionContext) {
 	)
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand("cline.plusButtonClicked", async () => {
+		vscode.commands.registerCommand("aline.plusButtonClicked", async () => {
 			outputChannel.appendLine("Plus button Clicked")
 			await sidebarProvider.clearTask()
+			await sidebarProvider.switchToClineView()
 			await sidebarProvider.postStateToWebview()
-			await sidebarProvider.postMessageToWebview({
-				type: "action",
-				action: "chatButtonClicked",
-			})
+			await sidebarProvider.postMessageToWebview({ type: "action", action: "chatButtonClicked" })
 		}),
 	)
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand("cline.mcpButtonClicked", () => {
-			sidebarProvider.postMessageToWebview({
-				type: "action",
-				action: "mcpButtonClicked",
-			})
+		vscode.commands.registerCommand("aline.mcpButtonClicked", () => {
+			if (!sidebarProvider.InClineView()) {
+				sidebarProvider.switchToClineView()
+			}
+			sidebarProvider.postMessageToWebview({ type: "action", action: "mcpButtonClicked" })
 		}),
 	)
 
@@ -88,25 +86,22 @@ export function activate(context: vscode.ExtensionContext) {
 		await vscode.commands.executeCommand("workbench.action.lockEditorGroup")
 	}
 
-	context.subscriptions.push(vscode.commands.registerCommand("cline.popoutButtonClicked", openClineInNewTab))
-	context.subscriptions.push(vscode.commands.registerCommand("cline.openInNewTab", openClineInNewTab))
+	context.subscriptions.push(vscode.commands.registerCommand("aline.popoutButtonClicked", openClineInNewTab))
+	context.subscriptions.push(vscode.commands.registerCommand("aline.openInNewTab", openClineInNewTab))
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand("cline.settingsButtonClicked", () => {
+		vscode.commands.registerCommand("aline.settingsButtonClicked", () => {
 			//vscode.window.showInformationMessage(message)
-			sidebarProvider.postMessageToWebview({
-				type: "action",
-				action: "settingsButtonClicked",
-			})
+			if (!sidebarProvider.InClineView()) {
+				sidebarProvider.switchToClineView()
+			}
+			sidebarProvider.postMessageToWebview({ type: "action", action: "settingsButtonClicked" })
 		}),
 	)
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand("cline.historyButtonClicked", () => {
-			sidebarProvider.postMessageToWebview({
-				type: "action",
-				action: "historyButtonClicked",
-			})
+		vscode.commands.registerCommand("aline.historyButtonClicked", () => {
+			sidebarProvider.postMessageToWebview({ type: "action", action: "historyButtonClicked" })
 		}),
 	)
 
@@ -122,7 +117,9 @@ export function activate(context: vscode.ExtensionContext) {
 			return Buffer.from(uri.query, "base64").toString("utf-8")
 		}
 	})()
-	context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(DIFF_VIEW_URI_SCHEME, diffContentProvider))
+	context.subscriptions.push(
+		vscode.workspace.registerTextDocumentContentProvider(DIFF_VIEW_URI_SCHEME, diffContentProvider),
+	)
 
 	// URI Handler
 	const handleUri = async (uri: vscode.Uri) => {
@@ -145,11 +142,12 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	}
 	context.subscriptions.push(vscode.window.registerUriHandler({ handleUri }))
-
+	alineActivate(context, sidebarProvider)
 	return createClineAPI(outputChannel, sidebarProvider)
 }
 
 // This method is called when your extension is deactivated
 export function deactivate() {
 	outputChannel.appendLine("Cline extension deactivated")
+	alineDeactivate()
 }

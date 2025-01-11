@@ -15,7 +15,7 @@ const AppContent = () => {
 	const [showHistory, setShowHistory] = useState(false)
 	const [showMcp, setShowMcp] = useState(false)
 	const [showAnnouncement, setShowAnnouncement] = useState(false)
-
+	const [activeTab, setActiveTab] = useState('CLINE')
 	const handleMessage = useCallback((e: MessageEvent) => {
 		const message: ExtensionMessage = e.data
 		switch (message.type) {
@@ -61,32 +61,41 @@ const AppContent = () => {
 
 	return (
 		<>
-			{showWelcome ? (
+			{false ? (
 				<WelcomeView />
 			) : (
 				<>
-					{showSettings && <SettingsView onDone={() => setShowSettings(false)} />}
-					{showHistory && <HistoryView onDone={() => setShowHistory(false)} />}
-					{showMcp && <McpView onDone={() => setShowMcp(false)} />}
-					{/* Do not conditionally load ChatView, it's expensive and there's state we don't want to lose (user input, disableInput, askResponse promise, etc.) */}
-					<ChatView
-						showHistoryView={() => {
-							setShowSettings(false)
-							setShowMcp(false)
-							setShowHistory(true)
-						}}
-						isHidden={showSettings || showHistory || showMcp}
-						showAnnouncement={showAnnouncement}
-						hideAnnouncement={() => {
-							setShowAnnouncement(false)
-						}}
-					/>
+					{/* Conditional rendering based on active tab */}
+					{activeTab === 'CLINE' && (
+						<>
+							{showSettings && <SettingsView onDone={() => setShowSettings(false)} />}
+							{showHistory && <HistoryView onDone={() => setShowHistory(false)} />}
+							{showMcp && <McpView onDone={() => setShowMcp(false)} />}
+							<ChatView
+								showHistoryView={() => {
+									setShowSettings(false)
+									setShowMcp(false)
+									setShowHistory(true)
+								}}
+								isHidden={showSettings || showHistory || showMcp}
+								showAnnouncement={showAnnouncement}
+								hideAnnouncement={() => {
+									setShowAnnouncement(false)
+								}}
+							/>
+						</>
+					)}
+					{activeTab === 'Chat' && (
+						<div>Chat View Content Here</div>
+					)}
+					{activeTab === 'Context' && (
+						<div>Context View Content Here</div>
+					)}
 				</>
 			)}
 		</>
 	)
 }
-
 const App = () => {
 	return (
 		<ExtensionStateContextProvider>

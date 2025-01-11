@@ -14,13 +14,7 @@ import {
 	phpQuery,
 	swiftQuery,
 } from "./queries"
-
-export interface LanguageParser {
-	[key: string]: {
-		parser: Parser
-		query: Parser.Query
-	}
-}
+import { LanguageParser } from "../../shared/AlineDefined"
 
 async function loadLanguage(langName: string) {
 	return await Parser.Language.load(path.join(__dirname, `tree-sitter-${langName}.wasm`))
@@ -58,8 +52,12 @@ Sources:
 - https://github.com/tree-sitter/tree-sitter/blob/master/lib/binding_web/test/query-test.js
 */
 export async function loadRequiredLanguageParsers(filesToParse: string[]): Promise<LanguageParser> {
-	await initializeParser()
 	const extensionsToLoad = new Set(filesToParse.map((file) => path.extname(file).toLowerCase().slice(1)))
+	return await loadLanguageParsers(extensionsToLoad)
+}
+
+export async function loadLanguageParsers(extensionsToLoad: Set<string>): Promise<LanguageParser> {
+	await initializeParser()
 	const parsers: LanguageParser = {}
 	for (const ext of extensionsToLoad) {
 		let language: Parser.Language
@@ -90,6 +88,7 @@ export async function loadRequiredLanguageParsers(filesToParse: string[]): Promi
 				language = await loadLanguage("go")
 				query = language.query(goQuery)
 				break
+			case "cxx":
 			case "cpp":
 			case "hpp":
 				language = await loadLanguage("cpp")

@@ -25,6 +25,12 @@ import ChatRow from "./ChatRow"
 import ChatTextArea from "./ChatTextArea"
 import TaskHeader from "./TaskHeader"
 import AutoApproveMenu from "./AutoApproveMenu"
+import { DropdownMenu, DropdownButton } from "./DropdownMenu"
+import { SystemPrompt } from "../../../../src/shared/SystemPrompt"
+import { ModelOption } from "../../../../src/shared/AlineConfig"
+import { CategoryOption, CategoryList } from "../../../../src/shared/AlineDefined"
+import styles from "./ChatView.module.css"
+
 
 interface ChatViewProps {
 	isHidden: boolean
@@ -36,7 +42,7 @@ interface ChatViewProps {
 export const MAX_IMAGES_PER_MESSAGE = 20 // Anthropic limits to 20 images
 
 const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryView }: ChatViewProps) => {
-	const { version, clineMessages: messages, taskHistory, apiConfiguration } = useExtensionState()
+	const { version, clineMessages: messages, taskHistory, apiConfiguration, systemPrompt, systemPrompts, modelOptions } = useExtensionState()
 
 	//const task = messages.length > 0 ? (messages[0].say === "task" ? messages[0] : undefined) : undefined) : undefined
 	const task = useMemo(() => messages.at(0), [messages]) // leaving this less safe version here since if the first message is not a task, then the extension is in a bad state and needs to be debugged (see Cline.abort)
@@ -61,6 +67,15 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 	const disableAutoScrollRef = useRef(false)
 	const [showScrollToBottom, setShowScrollToBottom] = useState(false)
 	const [isAtBottom, setIsAtBottom] = useState(false)
+	const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false)
+	const [isPromptDropdownOpen, setIsPromptDropdownOpen] = useState(false)
+	const dropdownRefModel = useRef<HTMLDivElement>(null)
+	const dropdownRefPrompt = useRef<HTMLDivElement>(null)
+	const [selectedPrompt, setSelectedPrompt] = useState<SystemPrompt | undefined>(systemPrompt)
+	const [selectedProvider, setSelectedProvider] = useState(() => {
+		const currentModel = modelOptions?.find(m => m.id === apiConfiguration?.apiProvider)
+		return currentModel?.name || apiConfiguration?.apiProvider || "Select Model"
+	})
 
 	// UI layout depends on the last 2 messages
 	// (since it relies on the content of these messages, we are deep comparing. i.e. the button state after hitting button sets enableButtons to false, and this effect otherwise would have to true again even if messages didn't change
@@ -231,7 +246,8 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 
 	const isStreaming = useMemo(() => {
 		const isLastAsk = !!modifiedMessages.at(-1)?.ask // checking clineAsk isn't enough since messages effect may be called again for a tool for example, set clineAsk to its value, and if the next message is not an ask then it doesn't reset. This is likely due to how much more often we're updating messages as compared to before, and should be resolved with optimizations as it's likely a rendering bug. but as a final guard for now, the cancel button will show if the last message is not an ask
-		const isToolCurrentlyAsking = isLastAsk && clineAsk !== undefined && enableButtons && primaryButtonText !== undefined
+		const isToolCurrentlyAsking =
+			isLastAsk && clineAsk !== undefined && enableButtons && primaryButtonText !== undefined
 		if (isToolCurrentlyAsking) {
 			return false
 		}
@@ -312,10 +328,7 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 			case "resume_task":
 			case "mistake_limit_reached":
 			case "auto_approval_max_req_reached":
-				vscode.postMessage({
-					type: "askResponse",
-					askResponse: "yesButtonClicked",
-				})
+				vscode.postMessage({ type: "askResponse", askResponse: "yesButtonClicked" })
 				break
 			case "completion_result":
 			case "resume_completed_task":
@@ -349,10 +362,7 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 			case "browser_action_launch":
 			case "use_mcp_server":
 				// responds to the API with a "This operation failed" and lets it try again
-				vscode.postMessage({
-					type: "askResponse",
-					askResponse: "noButtonClicked",
-				})
+				vscode.postMessage({ type: "askResponse", askResponse: "noButtonClicked" })
 				break
 		}
 		setTextAreaDisabled(true)
@@ -394,7 +404,9 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 				case "selectedImages":
 					const newImages = message.images ?? []
 					if (newImages.length > 0) {
-						setSelectedImages((prevImages) => [...prevImages, ...newImages].slice(0, MAX_IMAGES_PER_MESSAGE))
+						setSelectedImages((prevImages) =>
+							[...prevImages, ...newImages].slice(0, MAX_IMAGES_PER_MESSAGE),
+						)
 					}
 					break
 				case "invoke":
@@ -412,7 +424,14 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 			}
 			// textAreaRef.current is not explicitly required here since react gaurantees that ref will be stable across re-renders, and we're not using its value but its reference.
 		},
-		[isHidden, textAreaDisabled, enableButtons, handleSendMessage, handlePrimaryButtonClick, handleSecondaryButtonClick],
+		[
+			isHidden,
+			textAreaDisabled,
+			enableButtons,
+			handleSendMessage,
+			handlePrimaryButtonClick,
+			handleSecondaryButtonClick,
+		],
 	)
 
 	useEvent("message", handleMessage)
@@ -450,7 +469,6 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 			switch (message.say) {
 				case "api_req_finished": // combineApiRequests removes this from modifiedMessages anyways
 				case "api_req_retried": // this message is used to update the latest api_req_started that the request was retried
-				case "deleted_api_reqs": // aggregated api_req metrics from deleted messages
 					return false
 				case "text":
 					// Sometimes cline returns an empty text message, we don't want to render these. (We also use a say text for user messages, so in case they just sent images we still render that)
@@ -471,9 +489,13 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 			return ["browser_action_launch"].includes(message.ask!)
 		}
 		if (message.type === "say") {
-			return ["browser_action_launch", "api_req_started", "text", "browser_action", "browser_action_result"].includes(
-				message.say!,
-			)
+			return [
+				"browser_action_launch",
+				"api_req_started",
+				"text",
+				"browser_action",
+				"browser_action_result",
+			].includes(message.say!)
 		}
 		return false
 	}
@@ -700,6 +722,116 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 		[expandedRows, modifiedMessages, groupedMessages.length, toggleRowExpansion, handleRowHeightChange],
 	)
 
+	const modelOptionsToCategories = (modelOptions: ModelOption[]): CategoryList[] => {
+		const categoryMap = new Map<string, CategoryOption[]>()
+		
+		modelOptions.filter(model => model.visible)
+			.sort((a, b) => a.order - b.order)
+			.forEach(model => {
+				const category = model.category || 'uncategorized'
+				if (!categoryMap.has(category)) {
+					categoryMap.set(category, [])
+				}
+				categoryMap.get(category)?.push({
+					title: model.name,
+					model: model.id,
+					provider: model.id,
+				})
+			})
+
+		const categories: CategoryList[] = []
+		categoryMap.forEach((models, category) => {
+			categories.push({
+				title: category,
+				options: models
+			})
+		})
+		return categories
+	}
+
+	const systemPromptsToCategories = (prompts: SystemPrompt[] | undefined): CategoryList[] => {
+		if (!prompts) return []
+		const categoryMap = new Map<string, CategoryOption[]>()
+		
+		prompts.forEach(prompt => {
+			const category = prompt.category || 'General'
+			if (!categoryMap.has(category)) {
+				categoryMap.set(category, [])
+			}
+			categoryMap.get(category)?.push({
+				title: prompt.name,
+				model: prompt.id,
+				provider: prompt.id
+			})
+		})
+
+		return Array.from(categoryMap.entries())
+			.map(([title, options]) => ({
+				title,
+				options: options.sort((a, b) => a.title.localeCompare(b.title))
+			}))
+			.sort((a, b) => a.title.localeCompare(b.title))
+	}
+
+	const handleEditPrompt = () => {
+		setIsPromptDropdownOpen(false)
+		vscode.postMessage({
+			type: "openFile",
+			text: "{SystemPromptFile}"
+		})
+	}
+
+	const handleEditModel = () => {
+		setIsModelDropdownOpen(false)
+		vscode.postMessage({
+			type: "openFile",
+			text: "{ModelOptionFile}"
+		})
+	}
+
+	const handleToggleModelDropdown = () => {
+		const newIsOpen = !isModelDropdownOpen
+		setIsModelDropdownOpen(newIsOpen)
+		if (newIsOpen) {
+			vscode.postMessage({
+				type: "loadModelOptions",
+			})
+		}
+	}
+
+	const handleTogglePromptDropdown = () => {
+		const newIsOpen = !isPromptDropdownOpen
+		setIsPromptDropdownOpen(newIsOpen)
+		if (newIsOpen) {
+			vscode.postMessage({
+				type: "loadSystemPrompts",
+			})
+		}
+	}
+
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			if (dropdownRefModel.current && !dropdownRefModel.current.contains(event.target as Node)) {
+				setIsModelDropdownOpen(false)
+			}
+			if (dropdownRefPrompt.current && !dropdownRefPrompt.current.contains(event.target as Node)) {
+				setIsPromptDropdownOpen(false)
+			}
+		}
+
+		document.addEventListener('mousedown', handleClickOutside)
+		return () => document.removeEventListener('mousedown', handleClickOutside)
+	}, [])
+
+	useEffect(() => {
+		setSelectedPrompt(systemPrompt)
+	}, [systemPrompt])
+
+	useEffect(() => {
+		const currentModel = modelOptions?.find(m => m.id === apiConfiguration?.apiProvider)
+		setSelectedProvider(currentModel?.name || apiConfiguration?.apiProvider || "Select Model")
+	}, [apiConfiguration?.apiProvider, modelOptions])
+
 	return (
 		<div
 			style={{
@@ -743,10 +875,10 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 								style={{ display: "inline" }}>
 								Claude 3.5 Sonnet's agentic coding capabilities,
 							</VSCodeLink>{" "}
-							I can handle complex software development tasks step-by-step. With tools that let me create & edit
-							files, explore complex projects, use the browser, and execute terminal commands (after you grant
-							permission), I can assist you in ways that go beyond code completion or tech support. I can even use
-							MCP to create new tools and extend my own capabilities.
+							I can handle complex software development tasks step-by-step. With tools that let me create
+							& edit files, explore complex projects, use the browser, and execute terminal commands
+							(after you grant permission), I can assist you in ways that go beyond code completion or
+							tech support. I can even use MCP to create new tools and extend my own capabilities.
 						</p>
 					</div>
 					{taskHistory.length > 0 && <HistoryPreview showHistoryView={showHistoryView} />}
@@ -793,10 +925,7 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 								Footer: () => <div style={{ height: 5 }} />, // Add empty padding at the bottom
 							}}
 							// increasing top by 3_000 to prevent jumping around when user collapses a row
-							increaseViewportBy={{
-								top: 3_000,
-								bottom: Number.MAX_SAFE_INTEGER,
-							}} // hack to make sure the last message is always rendered to get truly perfect scroll to bottom animation when new messages are added (Number.MAX_SAFE_INTEGER is safe for arithmetic operations, which is all virtuoso uses this value for in src/sizeRangeSystem.ts)
+							increaseViewportBy={{ top: 3_000, bottom: Number.MAX_SAFE_INTEGER }} // hack to make sure the last message is always rendered to get truly perfect scroll to bottom animation when new messages are added (Number.MAX_SAFE_INTEGER is safe for arithmetic operations, which is all virtuoso uses this value for in src/sizeRangeSystem.ts)
 							data={groupedMessages} // messages is the raw format returned by extension, modifiedMessages is the manipulated structure that combines certain messages of related type, and visibleMessages is the filtered structure that removes messages that should not be rendered
 							itemContent={itemContent}
 							atBottomStateChange={(isAtBottom) => {
@@ -865,6 +994,7 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 					)}
 				</>
 			)}
+	
 			<ChatTextArea
 				ref={textAreaRef}
 				inputValue={inputValue}
@@ -882,6 +1012,84 @@ const ChatView = ({ isHidden, showAnnouncement, hideAnnouncement, showHistoryVie
 					}
 				}}
 			/>
+
+			<div style={{ display: "flex", flexDirection: "column" }}>
+				<div style={{
+					display: "flex",
+					padding: "1px 15px 5px 10px", // Adjust padding to be closer to input
+					gap: "8px",
+					backgroundColor: "transparent",
+				}}>
+
+					<div style={{ 
+						height: "18px", 
+						width: "1px", 
+						backgroundColor: "var(--vscode-input-border)",
+						margin: "0 4px"
+					}} />
+
+					<div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+						<div className={styles.dropdown} ref={dropdownRefPrompt}>
+							<DropdownButton
+								onClick={handleTogglePromptDropdown}
+								icon="terminal"
+								label={selectedPrompt?.name || "Select Prompt"}
+							/>
+
+							<DropdownMenu
+								isOpen={isPromptDropdownOpen}
+								categories={systemPromptsToCategories(systemPrompts || [])}
+								onSelect={(option) => {
+									setIsPromptDropdownOpen(false)
+									const newPrompt = systemPrompts?.find(p => p.id === option.model)
+									setSelectedPrompt(newPrompt)
+									vscode.postMessage({
+										type: "updateSystemPrompt",
+										text: option.model,
+									})
+								}}
+								onEdit={handleEditPrompt}
+								icon="terminal"
+								label="System Prompt"
+								position="left"
+							/>
+						</div>
+					</div>
+
+					<div style={{ 
+						height: "18px", 
+						width: "1px", 
+						backgroundColor: "var(--vscode-input-border)",
+						margin: "0 4px"
+					}} />
+
+					<div className={styles.dropdown} ref={dropdownRefModel}>
+						<DropdownButton
+							onClick={handleToggleModelDropdown}
+							icon="rocket" 
+							label={selectedProvider}
+						/>
+
+						<DropdownMenu
+							isOpen={isModelDropdownOpen}
+							categories={modelOptionsToCategories(modelOptions || [])}
+							onSelect={(option) => {
+								setIsModelDropdownOpen(false)
+								setSelectedProvider(option.model)
+								vscode.postMessage({
+									type: "switchToProvider",
+									text: option.model,
+								})
+							}}
+							onEdit={handleEditModel}
+							icon="rocket"
+							label="Model"
+							position="center"
+						/>
+					</div>
+				</div>
+			</div>
+
 		</div>
 	)
 }

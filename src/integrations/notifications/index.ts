@@ -71,22 +71,15 @@ export async function showSystemNotification(options: NotificationOptions): Prom
 			throw new Error("Message is required")
 		}
 
-		const escapedOptions = {
-			...options,
-			title: title.replace(/"/g, '\\"'),
-			message: message.replace(/"/g, '\\"'),
-			subtitle: options.subtitle?.replace(/"/g, '\\"') || "",
-		}
-
 		switch (platform()) {
 			case "darwin":
-				await showMacOSNotification(escapedOptions)
+				await showMacOSNotification({ ...options, title })
 				break
 			case "win32":
-				await showWindowsNotification(escapedOptions)
+				await showWindowsNotification({ ...options, title })
 				break
 			case "linux":
-				await showLinuxNotification(escapedOptions)
+				await showLinuxNotification({ ...options, title })
 				break
 			default:
 				throw new Error("Unsupported platform")

@@ -2,11 +2,17 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { useEvent } from "react-use"
 import { DEFAULT_AUTO_APPROVAL_SETTINGS } from "../../../src/shared/AutoApprovalSettings"
 import { ExtensionMessage, ExtensionState } from "../../../src/shared/ExtensionMessage"
-import { ApiConfiguration, ModelInfo, openRouterDefaultModelId, openRouterDefaultModelInfo } from "../../../src/shared/api"
+import {
+	ApiConfiguration,
+	ModelInfo,
+	openRouterDefaultModelId,
+	openRouterDefaultModelInfo,
+} from "../../../src/shared/api"
 import { findLastIndex } from "../../../src/shared/array"
 import { McpServer } from "../../../src/shared/mcp"
 import { convertTextMateToHljs } from "../utils/textMateToHljs"
 import { vscode } from "../utils/vscode"
+import { CLINE_SYSTEM_PROMPT, SystemPrompt } from "../../../src/shared/SystemPrompt"
 
 interface ExtensionStateContextType extends ExtensionState {
 	didHydrateState: boolean
@@ -18,19 +24,21 @@ interface ExtensionStateContextType extends ExtensionState {
 	setApiConfiguration: (config: ApiConfiguration) => void
 	setCustomInstructions: (value?: string) => void
 	setShowAnnouncement: (value: boolean) => void
+	setSystemPrompt: (value: SystemPrompt) => void
 }
 
 const ExtensionStateContext = createContext<ExtensionStateContextType | undefined>(undefined)
 
-export const ExtensionStateContextProvider: React.FC<{
-	children: React.ReactNode
-}> = ({ children }) => {
+export const ExtensionStateContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 	const [state, setState] = useState<ExtensionState>({
 		version: "",
 		clineMessages: [],
 		taskHistory: [],
+		systemPrompts: [],
+		systemPrompt: CLINE_SYSTEM_PROMPT,
 		shouldShowAnnouncement: false,
 		autoApprovalSettings: DEFAULT_AUTO_APPROVAL_SETTINGS,
+		modelOptions: [],
 	})
 	const [didHydrateState, setDidHydrateState] = useState(false)
 	const [showWelcome, setShowWelcome] = useState(false)
@@ -43,6 +51,7 @@ export const ExtensionStateContextProvider: React.FC<{
 
 	const handleMessage = useCallback((event: MessageEvent) => {
 		const message: ExtensionMessage = event.data
+		// console.log(`received message: ${ JSON.stringify(message) }`)
 		switch (message.type) {
 			case "state": {
 				setState(message.state!)
@@ -58,7 +67,6 @@ export const ExtensionStateContextProvider: React.FC<{
 							config.lmStudioModelId,
 							config.geminiApiKey,
 							config.openAiNativeApiKey,
-							config.deepSeekApiKey,
 						].some((key) => key !== undefined)
 					: false
 				setShowWelcome(!hasKey)
@@ -118,21 +126,10 @@ export const ExtensionStateContextProvider: React.FC<{
 		openRouterModels,
 		mcpServers,
 		filePaths,
-		setApiConfiguration: (value) =>
-			setState((prevState) => ({
-				...prevState,
-				apiConfiguration: value,
-			})),
-		setCustomInstructions: (value) =>
-			setState((prevState) => ({
-				...prevState,
-				customInstructions: value,
-			})),
-		setShowAnnouncement: (value) =>
-			setState((prevState) => ({
-				...prevState,
-				shouldShowAnnouncement: value,
-			})),
+		setApiConfiguration: (value) => setState((prevState) => ({ ...prevState, apiConfiguration: value })),
+		setCustomInstructions: (value) => setState((prevState) => ({ ...prevState, customInstructions: value })),
+		setShowAnnouncement: (value) => setState((prevState) => ({ ...prevState, shouldShowAnnouncement: value })),
+		setSystemPrompt: (value) => setState((prevState) => ({ ...prevState, systemPrompt: value })),
 	}
 
 	return <ExtensionStateContext.Provider value={contextValue}>{children}</ExtensionStateContext.Provider>
